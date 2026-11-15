@@ -370,14 +370,14 @@
       <h2>Real places, real imagery</h2>
       <p class="lede">Every target and analog in this app is a real location you can visit — shown here in photographs from NASA's public image library.</p>
       <div class="ggrid">
-        <figure class="gcard rv"><img src="img/t-shackleton.jpg" loading="lazy" alt="Lunar south pole"><span class="gtag moon">MOON</span><figcaption><b>The lunar south pole</b>LROC mosaic around the Shackleton target region · NASA / ASU</figcaption></figure>
-        <figure class="gcard rv"><img src="img/t-marius.jpg" loading="lazy" alt="Marius Hills pit"><span class="gtag moon">MOON</span><figcaption><b>Marius Hills pit</b>possible lava-tube skylight — the cave-habitat target · NASA / GSFC / ASU</figcaption></figure>
-        <figure class="gcard rv"><img src="img/t-jezero.jpg" loading="lazy" alt="Jezero Crater"><span class="gtag mars">MARS</span><figcaption><b>Jezero Crater</b>Perseverance's ground view of the ancient river delta · NASA / JPL-Caltech</figcaption></figure>
-        <figure class="gcard rv"><img src="img/t-noctis.jpg" loading="lazy" alt="Noctis Labyrinthus"><span class="gtag mars">MARS</span><figcaption><b>Noctis Labyrinthus</b>canyon labyrinth on the rim of Valles Marineris · NASA / JPL-Caltech</figcaption></figure>
-        <figure class="gcard rv"><img src="img/s-atacama.jpg" loading="lazy" alt="Atacama Desert"><span class="gtag earth">EARTH</span><figcaption><b>Yungay, Atacama</b>NASA field campaigns test Mars rovers in this desert · NASA</figcaption></figure>
-        <figure class="gcard rv"><img src="img/s-iceland.jpg" loading="lazy" alt="Iceland geology training"><span class="gtag earth">EARTH</span><figcaption><b>Iceland Highlands</b>Artemis astronaut geology training on volcanic terrain · NASA / JSC</figcaption></figure>
-        <figure class="gcard rv"><img src="img/s-wadirum.jpg" loading="lazy" alt="Wadi Rum"><span class="gtag earth">EARTH</span><figcaption><b>Wadi Rum, Jordan</b>iron-stained red desert used as a Mars stand-in · NASA</figcaption></figure>
-        <figure class="gcard rv"><img src="img/s-uyuni.jpg" loading="lazy" alt="Salar de Uyuni"><span class="gtag earth">EARTH</span><figcaption><b>Salar de Uyuni</b>the flattest place on Earth, photographed from the ISS · NASA</figcaption></figure>
+        <figure class="gcard rv"><img src="t-shackleton.jpg" loading="lazy" alt="Lunar south pole"><span class="gtag moon">MOON</span><figcaption><b>The lunar south pole</b>LROC mosaic around the Shackleton target region · NASA / ASU</figcaption></figure>
+        <figure class="gcard rv"><img src="t-marius.jpg" loading="lazy" alt="Marius Hills pit"><span class="gtag moon">MOON</span><figcaption><b>Marius Hills pit</b>possible lava-tube skylight — the cave-habitat target · NASA / GSFC / ASU</figcaption></figure>
+        <figure class="gcard rv"><img src="t-jezero.jpg" loading="lazy" alt="Jezero Crater"><span class="gtag mars">MARS</span><figcaption><b>Jezero Crater</b>Perseverance's ground view of the ancient river delta · NASA / JPL-Caltech</figcaption></figure>
+        <figure class="gcard rv"><img src="t-noctis.jpg" loading="lazy" alt="Noctis Labyrinthus"><span class="gtag mars">MARS</span><figcaption><b>Noctis Labyrinthus</b>canyon labyrinth on the rim of Valles Marineris · NASA / JPL-Caltech</figcaption></figure>
+        <figure class="gcard rv"><img src="s-atacama.jpg" loading="lazy" alt="Atacama Desert"><span class="gtag earth">EARTH</span><figcaption><b>Yungay, Atacama</b>NASA field campaigns test Mars rovers in this desert · NASA</figcaption></figure>
+        <figure class="gcard rv"><img src="s-iceland.jpg" loading="lazy" alt="Iceland geology training"><span class="gtag earth">EARTH</span><figcaption><b>Iceland Highlands</b>Artemis astronaut geology training on volcanic terrain · NASA / JSC</figcaption></figure>
+        <figure class="gcard rv"><img src="s-wadirum.jpg" loading="lazy" alt="Wadi Rum"><span class="gtag earth">EARTH</span><figcaption><b>Wadi Rum, Jordan</b>iron-stained red desert used as a Mars stand-in · NASA</figcaption></figure>
+        <figure class="gcard rv"><img src="s-uyuni.jpg" loading="lazy" alt="Salar de Uyuni"><span class="gtag earth">EARTH</span><figcaption><b>Salar de Uyuni</b>the flattest place on Earth, photographed from the ISS · NASA</figcaption></figure>
       </div>
       <div class="gcredit">Images: NASA Image and Video Library (images.nasa.gov) — public domain</div>
     </div>
@@ -632,21 +632,21 @@ const CRITERIA = [
 
 // ---- imagery (downloaded from NASA Image and Video Library, public domain) ----
 const T_IMG = {
-  shackleton:'img/t-shackleton.jpg', peary:'img/t-peary.jpg', tranquillitatis:'img/t-tranquill.jpg', marius:'img/t-marius.jpg',
-  jezero:'img/t-jezero.jpg', gale:'img/t-gale.jpg', noctis:'img/t-noctis.jpg', elysium:'img/t-elysium.jpg'
+  shackleton:'t-shackleton.jpg', peary:'t-peary.jpg', tranquillitatis:'t-tranquill.jpg', marius:'t-marius.jpg',
+  jezero:'t-jezero.jpg', gale:'t-gale.jpg', noctis:'t-noctis.jpg', elysium:'t-elysium.jpg'
 };
 const SITE_IMG = {
-  'McMurdo Dry Valleys':'img/s-mcmurdo.jpg',
-  'Haughton Crater, Devon Island':'img/s-haughton.jpg',
-  'Yungay, Atacama Desert':'img/s-atacama.jpg',
-  'Death Valley (Badwater Basin)':'img/s-deathvalley.jpg',
-  'Askja Caldera, Iceland Highlands':'img/s-iceland.jpg',
-  'Kverkfjöll geothermal highlands':'img/s-iceland.jpg',
-  'HI-SEAS habitat, Mauna Loa flank':'img/s-maunaloa.jpg',
-  'Mount Etna volcanic field':'img/s-etna.jpg',
-  'Pilbara (Dresser Formation)':'img/s-pilbara.jpg',
-  'Lanzarote lava tubes (Jameos del Agua)':'img/s-lanzarote.jpg',
-  'Salar de Uyuni / Altiplano':'img/s-uyuni.jpg'
+  'McMurdo Dry Valleys':'s-mcmurdo.jpg',
+  'Haughton Crater, Devon Island':'s-haughton.jpg',
+  'Yungay, Atacama Desert':'s-atacama.jpg',
+  'Death Valley (Badwater Basin)':'s-deathvalley.jpg',
+  'Askja Caldera, Iceland Highlands':'s-iceland.jpg',
+  'Kverkfjöll geothermal highlands':'s-iceland.jpg',
+  'HI-SEAS habitat, Mauna Loa flank':'s-maunaloa.jpg',
+  'Mount Etna volcanic field':'s-etna.jpg',
+  'Pilbara (Dresser Formation)':'s-pilbara.jpg',
+  'Lanzarote lava tubes (Jameos del Agua)':'s-lanzarote.jpg',
+  'Salar de Uyuni / Altiplano':'s-uyuni.jpg'
 };
 
 const TARGETS = [
