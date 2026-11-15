@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AnalogFinder — Earth Analogs for Moon &amp; Mars Base Sites</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛰️</text></svg>">
+<meta name="theme-color" content="#0b0e17">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0e17; --panel:#121728; --panel2:#1a2138; --line:#2a3352;
+    --text:#e8ecf8; --muted:#9aa5c4; --accent:#7c8cff; --accent2:#43d9c0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;overflow:hidden}
+
+  /* ================= NAV ================= */
+  nav{height:54px;flex:0 0 54px;display:flex;align-items:center;gap:6px;padding:0 16px;
+    background:rgba(18,23,40,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);z-index:1000}
+  nav .logo{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:700;margin-right:10px;cursor:pointer;white-space:nowrap}
+  nav .logo span{background:linear-gradient(90deg,#7c8cff,#43d9c0);-webkit-background-clip:text;background-clip:text;color:transparent}
+  nav .navlink{background:none;border:none;color:var(--muted);font-size:12.5px;font-weight:600;padding:7px 11px;border-radius:9px;cursor:pointer;transition:.15s;white-space:nowrap}
+  nav .navlink:hover{color:var(--text);background:var(--panel2)}
+  nav .navlink.active{color:#fff;background:var(--panel2);box-shadow:inset 0 0 0 1px var(--line)}
+  nav .navlink.moon.active{box-shadow:inset 0 0 0 1px #6d9eff}
+  nav .navlink.mars.active{box-shadow:inset 0 0 0 1px #ff8a5c}
+  nav .badge{margin-left:auto;font-size:10.5px;color:var(--muted);border:1px solid var(--line);padding:4px 10px;border-radius:20px;white-space:nowrap}
+
+  #app{height:calc(100% - 54px);position:relative}
+  .view{display:none;height:100%}
+  .view.active{display:flex;animation:fadeIn .35s ease}
+  #view-home.active,#view-about.active{display:block}
+  #view-home,#view-about{overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* ================= HOME ================= */
+  #view-home{flex-direction:column;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth}
+  #view-home::-webkit-scrollbar,.sidebar::-webkit-scrollbar,#cardBody::-webkit-scrollbar{width:8px}
+  #view-home::-webkit-scrollbar-thumb,.sidebar::-webkit-scrollbar-thumb,#cardBody::-webkit-scrollbar-thumb{background:#2a3352;border-radius:4px}
+
+  .hero{position:relative;padding:72px 24px 60px;text-align:center;overflow:hidden;
+    background:radial-gradient(1100px 480px at 50% -80px,#1c2450 0%,#0b0e17 62%)}
+  #stars{position:absolute;inset:0;pointer-events:none}
+  .star{position:absolute;background:#dfe6ff;border-radius:50%;animation:tw 3s infinite}
+  @keyframes tw{0%,100%{opacity:.25}50%{opacity:1}}
+  .hero .chip{display:inline-block;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent2);
+    border:1px solid rgba(67,217,192,.4);background:rgba(67,217,192,.08);padding:5px 14px;border-radius:20px;margin-bottom:18px}
+  .hero h1{font-size:44px;line-height:1.15;max-width:820px;margin:0 auto 16px;font-weight:800}
+  .hero h1 .grad{background:linear-gradient(90deg,#8fb0ff,#43d9c0 55%,#ffd166);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.sub{color:var(--muted);font-size:15.5px;max-width:640px;margin:0 auto 26px;line-height:1.6}
+  .hero .ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .cta{font-size:14px;font-weight:700;padding:12px 26px;border-radius:12px;border:1px solid var(--line);cursor:pointer;transition:.2s;background:var(--panel2);color:var(--text)}
+  .cta.moonC{border-color:#3d5aa8}.cta.moonC:hover{box-shadow:0 0 26px rgba(124,140,255,.35);transform:translateY(-2px)}
+  .cta.marsC{border-color:#a8503a}.cta.marsC:hover{box-shadow:0 0 26px rgba(255,138,92,.35);transform:translateY(-2px)}
+  .cta.ghost{background:transparent;color:var(--muted)}.cta.ghost:hover{color:var(--text);border-color:var(--accent)}
+  .orbit{position:absolute;border:1px dashed rgba(124,140,255,.18);border-radius:50%;pointer-events:none}
+  .planet{position:absolute;font-size:34px;pointer-events:none;animation:float 7s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:960px;margin:-26px auto 0;padding:0 24px;position:relative;z-index:5}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 10px;text-align:center}
+  .stat .n{font-size:30px;font-weight:800;font-family:Consolas,monospace;background:linear-gradient(90deg,#7c8cff,#43d9c0);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stat .l{font-size:11px;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+
+  .wrap{max-width:1060px;margin:0 auto;padding:52px 24px}
+  .wrap h2{font-size:24px;text-align:center;margin-bottom:6px}
+  .wrap .lede{text-align:center;color:var(--muted);font-size:13.5px;margin-bottom:34px}
+  .fgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .feat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 18px;transition:.2s}
+  .feat:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  .feat .ic{font-size:26px}
+  .feat h3{font-size:14.5px;margin:10px 0 6px}
+  .feat p{font-size:12.5px;color:var(--muted);line-height:1.55}
+
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;counter-reset:st}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;position:relative}
+  .step::before{counter-increment:st;content:"0" counter(st);font-family:Consolas,monospace;font-size:26px;font-weight:800;
+    background:linear-gradient(90deg,#7c8cff,#43d9c0);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .step h4{font-size:13.5px;margin:8px 0 5px}
+  .step p{font-size:12px;color:var(--muted);line-height:1.5}
+
+  .datasrc{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+  .dchip{font-size:11.5px;color:var(--muted);border:1px solid var(--line);background:var(--panel);border-radius:20px;padding:7px 14px}
+  .dchip b{color:var(--text);font-weight:600}
+
+  .honest{max-width:960px;margin:0 auto 52px;padding:0 24px}
+  .honest .box{border:1px solid #5a3b6b;background:linear-gradient(120deg,#1c1526,#171224);border-radius:16px;padding:22px 26px;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .honest .ic{font-size:34px}
+  .honest h3{font-size:15px;color:#ff9ad2;margin-bottom:5px}
+  .honest p{font-size:12.5px;color:#d8c4e2;line-height:1.55}
+
+  footer{border-top:1px solid var(--line);padding:20px;text-align:center;color:var(--muted);font-size:11.5px;line-height:1.7}
+
+  /* about page */
+  .formula{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 22px;font-family:Consolas,monospace;font-size:13px;line-height:1.9;color:#c9d2ea;overflow-x:auto}
+  .formula b{color:var(--accent2)}
+  .vtable{width:100%;border-collapse:collapse;font-size:12.5px}
+  .vtable th{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .vtable td{padding:9px 10px;border-bottom:1px solid rgba(42,51,82,.55)}
+  .vtable tr:hover td{background:rgba(124,140,255,.05)}
+  .vtable .tname{font-weight:600}
+  .vtable .note{color:var(--muted);font-size:11px}
+  .vtable .rk{font-family:Consolas,monospace;font-weight:700;color:var(--accent2)}
+  .vtable .sc{font-family:Consolas,monospace;color:var(--muted)}
+  .pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 9px;border-radius:12px}
+  .pill.pass{background:rgba(67,217,192,.15);color:#43d9c0;border:1px solid rgba(67,217,192,.45)}
+  .pill.warn{background:rgba(255,209,102,.15);color:#ffd166;border:1px solid rgba(255,209,102,.45)}
+  .pill.fail{background:rgba(239,106,106,.15);color:#ef6a6a;border:1px solid rgba(239,106,106,.45)}
+
+  /* ================= IMAGERY (gallery, thumbs, card banner) ================= */
+  .ggrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .gcard{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--panel);
+    transition:transform .25s,border-color .25s,box-shadow .25s}
+  .gcard:hover{transform:translateY(-4px);border-color:var(--accent);box-shadow:0 14px 34px rgba(0,0,0,.45)}
+  .gcard img{width:100%;height:148px;object-fit:cover;display:block;transition:transform .45s ease}
+  .gcard:hover img{transform:scale(1.06)}
+  .gtag{position:absolute;top:10px;left:10px;font-size:9px;font-weight:700;letter-spacing:1.2px;padding:3px 9px;border-radius:20px;backdrop-filter:blur(6px);background:rgba(11,14,23,.55)}
+  .gtag.moon{color:#b9ccff;border:1px solid rgba(124,140,255,.55)}
+  .gtag.mars{color:#ffc4a8;border:1px solid rgba(255,138,92,.55)}
+  .gtag.earth{color:#8ef0dc;border:1px solid rgba(67,217,192,.55)}
+  .gcard figcaption{padding:9px 11px;font-size:11px;color:var(--muted);line-height:1.45}
+  .gcard figcaption b{color:var(--text);display:block;font-size:11.5px;margin-bottom:2px}
+  .gcredit{text-align:center;font-size:10px;color:var(--muted);margin-top:10px;letter-spacing:.4px}
+
+  .rv{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s ease}
+  .rv.on{opacity:1;transform:none}
+  .ggrid .rv:nth-child(2){transition-delay:.05s}.ggrid .rv:nth-child(3){transition-delay:.1s}
+  .ggrid .rv:nth-child(4){transition-delay:.15s}.ggrid .rv:nth-child(5){transition-delay:.05s}
+  .ggrid .rv:nth-child(6){transition-delay:.1s}.ggrid .rv:nth-child(7){transition-delay:.15s}
+  .ggrid .rv:nth-child(8){transition-delay:.2s}
+  @media (prefers-reduced-motion:reduce){.rv{transition:none;opacity:1;transform:none}}
+
+  .tcard{position:relative;overflow:hidden;text-shadow:0 1px 3px rgba(4,7,14,.75)}
+  .tthumb{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.2;transition:opacity .3s;pointer-events:none}
+  .tcard:hover .tthumb{opacity:.34}
+  .tcard.active .tthumb{opacity:.45}
+  .tcard .body,.tcard .nm,.tcard .fp{position:relative;z-index:1}
+
+  .cardImg{width:100%;height:92px;object-fit:cover;display:block;border-bottom:1px solid var(--line)}
+  .vsum{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 4px}
+  .vsum .box{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center}
+  .vsum .box .n{font-size:24px;font-weight:800;font-family:Consolas,monospace}
+  .vsum .box .l{font-size:10.5px;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:1px}
+  .vnote{font-size:11.5px;color:var(--muted);line-height:1.55;margin-top:10px}
+  .ai{border:1px solid var(--line);background:var(--panel);border-radius:14px;padding:16px 18px;font-size:12.5px;color:var(--muted);line-height:1.6}
+
+  /* ================= EXPLORER (Moon / Mars) ================= */
+  .explorer{flex-direction:column}
+  .exHero{flex:0 0 auto;padding:16px 22px;display:flex;gap:16px;align-items:center;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .exHero .big{font-size:34px;filter:drop-shadow(0 0 14px rgba(124,140,255,.5))}
+  .explorer[data-body="mars"] .exHero .big{filter:drop-shadow(0 0 14px rgba(255,138,92,.5))}
+  .exHero h2{font-size:19px}
+  .exHero .desc{font-size:12px;color:var(--muted);margin-top:2px;max-width:520px;line-height:1.45}
+  .facts{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+  .fact{font-size:11px;font-family:Consolas,monospace;border:1px solid var(--line);border-radius:20px;padding:6px 12px;color:var(--muted);background:var(--panel)}
+  .fact b{color:var(--accent2)}
+
+  .explorer[data-body="moon"]{--accent:#8fb7ff;--accent2:#7ee7d2}
+  .explorer[data-body="mars"]{--accent:#ff9d7a;--accent2:#ffd166}
+
+  .exMain{flex:1;display:flex;min-height:0}
+  .sidebar{width:315px;flex:0 0 315px;background:var(--panel);border-right:1px solid var(--line);overflow-y:auto;min-height:0}
+  .sidebar section{padding:12px 14px;border-bottom:1px solid var(--line)}
+  .sidebar h3.s{font-size:10.5px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin-bottom:9px}
+
+  .tgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .tcard{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 8px;cursor:pointer;transition:.15s}
+  .tcard:hover{border-color:var(--accent)}
+  .tcard.active{border-color:var(--accent);background:linear-gradient(160deg,#1e2745,#1a2138)}
+  .explorer[data-body="mars"] .tcard.active{background:linear-gradient(160deg,#2c1f2b,#241a20)}
+  .tcard .body{font-size:14px;vertical-align:-1px}
+  .tcard .nm{font-size:12px;font-weight:600;display:block;margin:2px 0 3px;line-height:1.2}
+  .tcard .fp{font-size:9px;color:var(--muted);font-family:Consolas,monospace}
+
+  .wrow{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px}
+  .wrow label{flex:0 0 92px;color:var(--muted)}
+  .wrow input[type=range]{flex:1;accent-color:var(--accent);height:4px}
+  .wrow .val{flex:0 0 30px;text-align:right;font-family:Consolas,monospace;color:var(--accent2);font-size:11px}
+  .wreset{margin-top:2px;background:none;border:1px solid var(--line);color:var(--muted);font-size:10.5px;padding:3px 10px;border-radius:6px;cursor:pointer}
+  .wreset:hover{border-color:var(--accent);color:var(--text)}
+  .deadNote{font-size:10.5px;line-height:1.5;color:#ffd166;background:rgba(255,209,102,.08);border:1px solid rgba(255,209,102,.35);border-radius:8px;padding:7px 9px;margin-bottom:7px}
+
+  .ritem{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:7px 10px;margin-bottom:6px;cursor:pointer;transition:.15s}
+  .ritem:hover{border-color:var(--accent)}
+  .ritem.new::after{content:"NEW";font-size:8.5px;background:var(--accent2);color:#04231d;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:6px;vertical-align:1px}
+  .ritem .top{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+  .ritem .rk{font-size:10px;color:var(--muted);font-family:Consolas,monospace}
+  .ritem .nm{font-size:12.5px;font-weight:600;flex:1}
+  .ritem .sc{font-size:13px;font-weight:700;color:var(--accent2);font-family:Consolas,monospace}
+  .ritem .bar{height:3px;background:#26304f;border-radius:2px;margin-top:6px;overflow:hidden}
+  .ritem .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:2px}
+  .rankHint{padding:0 14px 12px;font-size:10.5px;color:var(--muted);line-height:1.4}
+
+  .mapWrap{flex:1;position:relative;min-width:0}
+  .mapEl{position:absolute;inset:0;background:#0b0e17}
+  .mapHead{position:absolute;top:10px;left:52px;z-index:800;background:rgba(18,23,40,.92);border:1px solid var(--line);border-radius:10px;padding:8px 14px;max-width:400px}
+  .mapHead .tg{font-size:13.5px;font-weight:700}
+  .mapHead .sub{font-size:10.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+  .legend{position:absolute;bottom:14px;left:52px;z-index:800;background:rgba(18,23,40,.92);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:10.5px;color:var(--muted)}
+  .legend .sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 4px 0 0;vertical-align:-1px}
+  .bestBtn{position:absolute;bottom:14px;right:12px;z-index:850;background:linear-gradient(120deg,#2b3a6e,#233257);
+    border:1px solid var(--accent);color:var(--text);font-size:12px;font-weight:600;padding:9px 14px;border-radius:10px;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+  .bestBtn:hover{border-color:var(--accent2);color:var(--accent2)}
+  .explorer[data-body="mars"] .bestBtn{background:linear-gradient(120deg,#4e2b22,#3a231c)}
+
+  .leaflet-container{background:#0b0e17}
+  .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel2);color:var(--text);border-radius:10px}
+  .leaflet-popup-content b{font-size:13px}
+  .leaflet-popup-content{font-size:11.5px;line-height:1.45;margin:12px 14px}
+  .leaflet-bar a{background:var(--panel2);color:var(--text);border-bottom-color:var(--line)}
+  .siteLabel{background:rgba(18,23,40,.92);border:1px solid var(--line);color:var(--text);
+    font-size:10.5px;padding:3px 7px;border-radius:6px;box-shadow:none;white-space:nowrap}
+  .siteLabel::before{display:none}
+
+  /* comparison card */
+  .card{position:absolute;top:12px;right:12px;bottom:12px;width:392px;max-width:calc(100% - 60px);background:var(--panel);
+    border:1px solid var(--line);border-radius:14px;z-index:900;display:none;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.55)}
+  .card.show{display:flex}
+  .cardHd{padding:13px 16px 10px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
+  .cardHd .ttl{flex:1}
+  .cardHd h3{font-size:16px;line-height:1.2}
+  .cardHd .meta{font-size:11px;color:var(--muted);margin-top:3px}
+  .cardHd .meta b.new{color:var(--accent2)}
+  .cardHd .match{font-size:24px;font-weight:800;color:var(--accent2);font-family:Consolas,monospace}
+  .cardHd .match small{font-size:10px;color:var(--muted);display:block;font-weight:400}
+  .cardX{background:none;border:none;color:var(--muted);font-size:17px;cursor:pointer;padding:2px 4px}
+  .cardX:hover{color:#fff}
+  #cardBody{flex:1;overflow-y:auto;padding:12px 16px}
+  .secttl{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:12px 0 6px}
+  .radarBox{height:225px;position:relative;margin:2px 0 6px}
+  .critRows .cr{margin-bottom:9px}
+  .critRows .cl{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:3px}
+  .critRows .cl span:first-child{color:var(--muted)}
+  .critRows .cl span:last-child{font-family:Consolas,monospace;color:var(--accent2)}
+  .critRows .cb{height:5px;background:#26304f;border-radius:3px;overflow:hidden}
+  .critRows .cb i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .whyTxt{font-size:12px;line-height:1.55;color:#c9d2ea}
+  .targetFP{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:11.5px;line-height:1.6;font-family:Consolas,monospace;color:#c9d2ea;margin-bottom:4px}
+  .limits{background:#2a1e33;border:1px solid #5a3b6b;border-radius:9px;padding:9px 11px;font-size:11.5px;line-height:1.5;color:#e4c9ea}
+  .limits b{color:#ff9ad2}
+  .limrow{display:flex;gap:7px;margin-top:5px;font-size:11.5px}
+  .limrow .x{color:#ff7ab0;font-weight:700}
+  .limrow .ok{color:var(--accent2);font-weight:700}
+
+  @media (max-width:1100px){
+    .card{width:340px}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .fgrid{grid-template-columns:1fr 1fr}
+    .steps{grid-template-columns:1fr 1fr}
+    .ggrid{grid-template-columns:1fr 1fr}
+    nav .badge{display:none}
+  }
+
+  /* ================= MOBILE / TOUCH ================= */
+  *{-webkit-tap-highlight-color:transparent}
+  @media (max-width:760px){
+    /* nav: horizontally scrollable row */
+    nav{gap:4px;padding:0 10px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+    nav::-webkit-scrollbar{display:none}
+    nav .logo{font-size:14px;gap:6px;margin-right:4px}
+    nav .navlink{font-size:11.5px;padding:6px 9px;flex:0 0 auto}
+
+    /* home */
+    .hero{padding:48px 18px 46px}
+    .planet,.orbit{display:none}
+    .hero h1{font-size:30px;margin-bottom:12px}
+    .hero p.sub{font-size:13.5px;margin-bottom:20px}
+    .cta{font-size:13px;padding:10px 18px}
+    .stats{gap:8px;padding:0 16px;margin-top:-20px}
+    .stat{padding:13px 6px}
+    .stat .n{font-size:23px}
+    .stat .l{font-size:9px}
+    .wrap{padding:36px 18px}
+    .wrap h2{font-size:20px}
+    .fgrid,.steps{grid-template-columns:1fr}
+    .ggrid{grid-template-columns:1fr 1fr}
+    .gcard img{height:120px}
+    .honest .box{padding:16px 16px;gap:12px}
+    .honest .ic{font-size:26px}
+    .honest h3{font-size:14px}
+    footer{padding:16px 14px;font-size:10.5px}
+
+    /* about: tables become horizontally swipeable */
+    #view-about table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .vtable{font-size:11.5px}
+    .vtable th{font-size:9px;padding:7px 8px}
+    .vtable td{padding:8px;white-space:normal}
+    .vsum .box{min-width:128px;flex:1 1 40%}
+
+    /* explorer: map on top, controls scroll below */
+    .exHero{padding:12px 14px;gap:10px}
+    .exHero .big{font-size:26px}
+    .exHero h2{font-size:17px}
+    .exHero .desc{font-size:11px}
+    .facts{margin-left:0}
+    .fact{font-size:9.5px;padding:4px 9px}
+    .exMain{flex-direction:column;overflow-y:auto;overflow-x:hidden;min-height:0}
+    .mapWrap{order:-1;flex:0 0 44vh;min-height:44vh}
+    .sidebar{width:auto;flex:1 0 auto;border-right:none;border-top:1px solid var(--line);overflow:visible}
+    .tgrid{grid-template-columns:1fr 1fr}
+    .wrow label{flex:0 0 76px;font-size:11px}
+
+    /* map overlays */
+    .mapHead{top:8px;left:50px;right:10px;max-width:none;padding:6px 10px}
+    .mapHead .tg{font-size:12px}
+    .mapHead .sub{font-size:9.5px}
+    .legend{bottom:10px;left:10px;font-size:9.5px;padding:6px 9px}
+    .bestBtn{bottom:10px;right:10px;font-size:11px;padding:8px 11px}
+
+    /* comparison card becomes a near-fullscreen overlay */
+    .card{position:fixed;top:62px;right:8px;bottom:8px;left:8px;width:auto;max-width:none;z-index:950}
+    .cardHd{padding:11px 12px 9px}
+    .cardHd h3{font-size:14.5px}
+    .cardHd .match{font-size:20px}
+    .radarBox{height:190px}
+    #cardBody{padding:10px 12px}
+  }
+  @media (max-width:380px){
+    .hero h1{font-size:25px}
+    .navlink{font-size:10.5px}
+    .stat .n{font-size:19px}
+    .fact{font-size:8.5px}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo" onclick="showView('home')">🛰️ Analog<span>Finder</span></div>
+  <button class="navlink active" id="nl-home" onclick="showView('home')">Home</button>
+  <button class="navlink moon" id="nl-moon" onclick="showView('moon')">🌑 Moon Sites</button>
+  <button class="navlink mars" id="nl-mars" onclick="showView('mars')">🔴 Mars Sites</button>
+  <button class="navlink" id="nl-about" onclick="showView('about')">ℹ️ About / Method</button>
+  <span class="badge">NASA Space Apps Challenge 2026</span>
+</nav>
+
+<div id="app">
+
+  <!-- ============================= HOME ============================= -->
+  <div class="view active" id="view-home">
+    <div class="hero">
+      <div id="stars"></div>
+      <div class="orbit" style="width:520px;height:520px;top:-260px;left:-180px"></div>
+      <div class="orbit" style="width:760px;height:760px;top:-380px;right:-260px"></div>
+      <span class="planet" style="top:16%;left:9%">🌑</span>
+      <span class="planet" style="top:58%;right:8%;animation-delay:1.4s">🔴</span>
+      <span class="planet" style="top:24%;right:20%;font-size:22px;animation-delay:2.6s">🛰️</span>
+      <span class="chip">NASA Space Apps Challenge 2026</span>
+      <h1>Find Earth's twins for <span class="grad">Moon bases</span> &amp; <span class="grad">Mars outposts</span></h1>
+      <p class="sub">Pick a target site on the Moon or Mars. AnalogFinder turns its terrain fingerprint — slope, relief, temperature swing, minerals, surface cover — into a transparent score, and ranks real Earth locations by how well they match. On a map, with plain-language reasons and honest limits.</p>
+      <div class="ctas">
+        <button class="cta moonC" onclick="showView('moon')">🌑 Explore Moon analogs</button>
+        <button class="cta marsC" onclick="showView('mars')">🔴 Explore Mars analogs</button>
+        <button class="cta ghost" onclick="document.getElementById('featSec').scrollIntoView()">See how it works ↓</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="n" data-count="8">0</div><div class="l">Target sites</div></div>
+      <div class="stat"><div class="n" data-count="17">0</div><div class="l">Earth analogs</div></div>
+      <div class="stat"><div class="n" data-count="5">0</div><div class="l">Scoring criteria</div></div>
+      <div class="stat"><div class="n" data-count="0">0</div><div class="l">Backend servers</div></div>
+    </div>
+
+    <div class="wrap" id="gallerySec" style="padding-top:26px">
+      <h2>Real places, real imagery</h2>
+      <p class="lede">Every target and analog in this app is a real location you can visit — shown here in photographs from NASA's public image library.</p>
+      <div class="ggrid">
+        <figure class="gcard rv"><img src="img/t-shackleton.jpg" loading="lazy" alt="Lunar south pole"><span class="gtag moon">MOON</span><figcaption><b>The lunar south pole</b>LROC mosaic around the Shackleton target region · NASA / ASU</figcaption></figure>
+        <figure class="gcard rv"><img src="img/t-marius.jpg" loading="lazy" alt="Marius Hills pit"><span class="gtag moon">MOON</span><figcaption><b>Marius Hills pit</b>possible lava-tube skylight — the cave-habitat target · NASA / GSFC / ASU</figcaption></figure>
+        <figure class="gcard rv"><img src="img/t-jezero.jpg" loading="lazy" alt="Jezero Crater"><span class="gtag mars">MARS</span><figcaption><b>Jezero Crater</b>Perseverance's ground view of the ancient river delta · NASA / JPL-Caltech</figcaption></figure>
+        <figure class="gcard rv"><img src="img/t-noctis.jpg" loading="lazy" alt="Noctis Labyrinthus"><span class="gtag mars">MARS</span><figcaption><b>Noctis Labyrinthus</b>canyon labyrinth on the rim of Valles Marineris · NASA / JPL-Caltech</figcaption></figure>
+        <figure class="gcard rv"><img src="img/s-atacama.jpg" loading="lazy" alt="Atacama Desert"><span class="gtag earth">EARTH</span><figcaption><b>Yungay, Atacama</b>NASA field campaigns test Mars rovers in this desert · NASA</figcaption></figure>
+        <figure class="gcard rv"><img src="img/s-iceland.jpg" loading="lazy" alt="Iceland geology training"><span class="gtag earth">EARTH</span><figcaption><b>Iceland Highlands</b>Artemis astronaut geology training on volcanic terrain · NASA / JSC</figcaption></figure>
+        <figure class="gcard rv"><img src="img/s-wadirum.jpg" loading="lazy" alt="Wadi Rum"><span class="gtag earth">EARTH</span><figcaption><b>Wadi Rum, Jordan</b>iron-stained red desert used as a Mars stand-in · NASA</figcaption></figure>
+        <figure class="gcard rv"><img src="img/s-uyuni.jpg" loading="lazy" alt="Salar de Uyuni"><span class="gtag earth">EARTH</span><figcaption><b>Salar de Uyuni</b>the flattest place on Earth, photographed from the ISS · NASA</figcaption></figure>
+      </div>
+      <div class="gcredit">Images: NASA Image and Video Library (images.nasa.gov) — public domain</div>
+    </div>
+
+    <div class="wrap" id="featSec">
+      <h2>Everything you need to pick the right analog</h2>
+      <p class="lede">Built around open NASA &amp; partner data — no black box, no exaggerations.</p>
+      <div class="fgrid">
+        <div class="feat"><div class="ic">🎯</div><h3>Target picker</h3><p>Eight mission-relevant sites — four on the Moon (Shackleton rim, Peary rim, Tranquillitatis, Marius Hills skylight) and four on Mars (Jezero, Gale, Noctis Labyrinthus, Elysium) — each with a measurable terrain fingerprint.</p></div>
+        <div class="feat"><div class="ic">⚖️</div><h3>Weight sliders</h3><p>Care more about slope than minerals? Drag the sliders and the entire ranking re-sorts live. Scoring math stays fully visible — weighted average of per-criterion closeness.</p></div>
+        <div class="feat"><div class="ic">🗺️</div><h3>Analog map</h3><p>All 17 Earth candidates as scored, labeled markers on a clean dark globe. Click any of them for the full comparison card — no page reloads, no black box.</p></div>
+        <div class="feat"><div class="ic">📊</div><h3>Radar comparison</h3><p>Every site opens with a side-by-side radar chart: the candidate's closeness profile against a perfect target fit, plus per-criterion bars showing exactly where it wins and loses.</p></div>
+        <div class="feat"><div class="ic">✨</div><h3>New candidates layer</h3><p>Beyond the usual lists: five new candidate sites shortlisted with a documented screening approach — a slope + low-NDVI filter, then a mineral check. Fingerprint values shown here are estimates pending computation.</p></div>
+        <div class="feat"><div class="ic">🛡️</div><h3>Honest limits</h3><p>No Earth site has lunar vacuum, radiation or low gravity. Every single result carries a "what this analog can't test" panel, stated plainly.</p></div>
+      </div>
+    </div>
+
+    <div class="wrap" style="padding-top:0">
+      <h2>How it works</h2>
+      <p class="lede">Four steps from a distant world to a field-testable Earth location.</p>
+      <div class="steps">
+        <div class="step"><h4>Pick a target</h4><p>Choose a Moon or Mars base site and read its terrain fingerprint.</p></div>
+        <div class="step"><h4>Set your priorities</h4><p>Adjust the five weight sliders to match your mission's needs.</p></div>
+        <div class="step"><h4>Read the ranking</h4><p>All Earth candidates re-score instantly, from strongest match down.</p></div>
+        <div class="step"><h4>Open the card</h4><p>Compare fingerprints on a radar chart and read the honest limits.</p></div>
+      </div>
+    </div>
+
+    <div class="wrap" style="padding-top:0">
+      <h2>Designed for open data</h2>
+      <p class="lede">No real dataset is loaded in this demo — the terrain fingerprints are representative estimates. For submission, heavy processing runs offline in Python (earthaccess, rasterio, numpy) and exports one <b style="color:var(--text)">sites.json</b>; this app stays backend-free.</p>
+      <div class="datasrc">
+        <span class="dchip"><b>SRTM 30 m</b> · Earth elevation → slope &amp; roughness</span>
+        <span class="dchip"><b>EMIT L2B</b> · surface minerals</span>
+        <span class="dchip"><b>HLS</b> · NDVI to exclude vegetation</span>
+        <span class="dchip"><b>CRISM</b> · Mars mineral maps (ODE)</span>
+        <span class="dchip"><b>Mars Trek WMTS</b> · CTX &amp; MOLA basemap</span>
+        <span class="dchip"><b>LRO Diviner</b> · polar temperatures</span>
+      </div>
+    </div>
+
+    <div class="honest">
+      <div class="box">
+        <div class="ic">🧪</div>
+        <div>
+          <h3>Our honesty promise</h3>
+          <p>Earth analogs are for testing hardware, operations, geology and isolation — they can never reproduce vacuum, radiation or 1/6 g. Every result in AnalogFinder says so out loud, so mission planners know exactly what a field campaign can and cannot prove.</p>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      AnalogFinder — NASA Space Apps Challenge 2026 · Identify Earth locations that analog permanent Moon base &amp; Mars sites<br>
+      Transparent, adjustable scoring · honest limits for every site · new, data-backed candidates
+    </footer>
+  </div>
+
+  <!-- ============================ MOON ============================ -->
+  <div class="view explorer" id="view-moon" data-body="moon">
+    <div class="exHero">
+      <span class="big">🌑</span>
+      <div>
+        <h2>Moon base target sites</h2>
+        <div class="desc">Polar rims with sunlight and ice, flat mare plains, and lava-tube skylights for radiation shelter — matched against Earth's cold deserts, volcanic fields and impact craters.</div>
+      </div>
+      <div class="facts">
+        <span class="fact">gravity <b>1/6 g</b></span>
+        <span class="fact">surface swing <b>−173 → 127 °C</b></span>
+        <span class="fact">PSR ice <b>water resource</b></span>
+        <span class="fact">day-night <b>29.5 Earth days</b></span>
+      </div>
+    </div>
+    <div class="exMain">
+      <div class="sidebar">
+        <section><h3 class="s">1 · Pick a Moon target</h3><div class="tgrid" id="moonTargets"></div></section>
+        <section><h3 class="s">2 · Weight what matters</h3><div id="moonSliders"></div><div id="moonDead"></div><button class="wreset" id="moonReset">Reset weights</button></section>
+        <h3 class="s" style="padding:12px 14px 0">3 · Earth analog ranking</h3>
+        <div id="moonRank"></div>
+        <div class="rankHint">Click a ranking row or a map marker to open the full comparison card with the radar chart.</div>
+      </div>
+      <div class="mapWrap">
+        <div class="mapEl" id="moonMap"></div>
+        <div class="mapHead"><div class="tg" id="moonHeadTg"></div><div class="sub" id="moonHeadSub"></div></div>
+        <div class="legend"><span class="sw" style="background:#43d9c0"></span>strong &nbsp;<span class="sw" style="background:#ffd166"></span>fair &nbsp;<span class="sw" style="background:#ef6a6a"></span>weak &nbsp;<span class="sw" style="background:#8fb7ff;border-radius:2px"></span>new</div>
+        <button class="bestBtn" id="moonBest">⭐ Best-match comparison</button>
+        <div class="card" id="moonCard">
+          <div class="cardHd">
+            <div class="ttl"><h3 id="moonCName"></h3><div class="meta" id="moonCMeta"></div></div>
+            <div class="match"><span id="moonCScore"></span><small>MATCH</small></div>
+            <button class="cardX" id="moonCardX">✕</button>
+          </div>
+          <img class="cardImg" id="moonCardImg" alt="" style="display:none">
+          <div id="moonCardBody">
+            <div class="secttl" id="moonVsTitle">Terrain fingerprint vs target</div>
+            <div class="radarBox"><canvas id="moonRadar"></canvas></div>
+            <div class="critRows" id="moonCrit"></div>
+            <div class="secttl">Why this site</div><div class="whyTxt" id="moonWhy"></div>
+            <div class="secttl">Terrain fingerprint (raw values)</div><div class="targetFP" id="moonFP"></div>
+            <div class="secttl">What this analog can't test</div><div class="limits" id="moonLimits"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ MARS ============================ -->
+  <div class="view explorer" id="view-mars" data-body="mars">
+    <div class="exHero">
+      <span class="big">🔴</span>
+      <div>
+        <h2>Mars base target sites</h2>
+        <div class="desc">Lakebed clays and carbonates, layered sulfates, canyon caves and young lava plains — matched against Earth's deserts, salt flats, hydrothermal fields and lava tubes.</div>
+      </div>
+      <div class="facts">
+        <span class="fact">gravity <b>0.38 g</b></span>
+        <span class="fact">atmosphere <b>~1% of Earth</b></span>
+        <span class="fact">dust storms <b>global scale</b></span>
+        <span class="fact">temp swing <b>~60–70 K</b></span>
+      </div>
+    </div>
+    <div class="exMain">
+      <div class="sidebar">
+        <section><h3 class="s">1 · Pick a Mars target</h3><div class="tgrid" id="marsTargets"></div></section>
+        <section><h3 class="s">2 · Weight what matters</h3><div id="marsSliders"></div><div id="marsDead"></div><button class="wreset" id="marsReset">Reset weights</button></section>
+        <h3 class="s" style="padding:12px 14px 0">3 · Earth analog ranking</h3>
+        <div id="marsRank"></div>
+        <div class="rankHint">Click a ranking row or a map marker to open the full comparison card with the radar chart.</div>
+      </div>
+      <div class="mapWrap">
+        <div class="mapEl" id="marsMap"></div>
+        <div class="mapHead"><div class="tg" id="marsHeadTg"></div><div class="sub" id="marsHeadSub"></div></div>
+        <div class="legend"><span class="sw" style="background:#43d9c0"></span>strong &nbsp;<span class="sw" style="background:#ffd166"></span>fair &nbsp;<span class="sw" style="background:#ef6a6a"></span>weak &nbsp;<span class="sw" style="background:#8fb7ff;border-radius:2px"></span>new</div>
+        <button class="bestBtn" id="marsBest">⭐ Best-match comparison</button>
+        <div class="card" id="marsCard">
+          <div class="cardHd">
+            <div class="ttl"><h3 id="marsCName"></h3><div class="meta" id="marsCMeta"></div></div>
+            <div class="match"><span id="marsCScore"></span><small>MATCH</small></div>
+            <button class="cardX" id="marsCardX">✕</button>
+          </div>
+          <img class="cardImg" id="marsCardImg" alt="" style="display:none">
+          <div id="marsCardBody">
+            <div class="secttl" id="marsVsTitle">Terrain fingerprint vs target</div>
+            <div class="radarBox"><canvas id="marsRadar"></canvas></div>
+            <div class="critRows" id="marsCrit"></div>
+            <div class="secttl">Why this site</div><div class="whyTxt" id="marsWhy"></div>
+            <div class="secttl">Terrain fingerprint (raw values)</div><div class="targetFP" id="marsFP"></div>
+            <div class="secttl">What this analog can't test</div><div class="limits" id="marsLimits"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ============================ ABOUT ============================ -->
+  <div class="view" id="view-about">
+    <div class="wrap" style="padding-top:40px">
+      <h2>Methodology</h2>
+      <p class="lede">How AnalogFinder turns a distant world into a measurable Earth shortlist — and why you can trust (and check) every number.</p>
+
+      <div class="wrap" style="padding:0 0 34px">
+        <h2 style="font-size:17px;text-align:left">1 · The scoring engine</h2>
+        <p class="lede" style="text-align:left;margin-bottom:14px">Each target site carries a terrain fingerprint of five measurable criteria. For every Earth candidate we compute a closeness per criterion, then a weighted average:</p>
+        <div class="formula">
+          closeness<sub>i</sub> = max( 0, 1 − | Earth<sub>i</sub> − Target<sub>i</sub> | / scale<sub>i</sub> )<br>
+          score = Σ ( w<sub>i</sub> × closeness<sub>i</sub> ) / Σ w<sub>i</sub> &nbsp;&nbsp;<b>→ × 100 %</b>
+        </div>
+        <p class="lede" style="text-align:left;margin-top:14px">The user's sliders set <b style="color:var(--text)">w</b> — nothing is hidden. If you weight slope 3× and minerals 0×, the math says exactly that.</p>
+        <div class="vtable" style="background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-top:16px">
+          <table style="width:100%;border-collapse:collapse">
+            <tr><th>Criterion</th><th>Unit</th><th>Normalization scale</th><th>Why it matters</th></tr>
+            <tr><td class="tname">Mean slope</td><td>°</td><td>5°</td><td class="note">Traverse difficulty, landing-site safety, construction</td></tr>
+            <tr><td class="tname">Relief (10 km)</td><td>m</td><td>1,200 m</td><td class="note">Local terrain energy — roughness a rover/crew must deal with</td></tr>
+            <tr><td class="tname">Temperature swing</td><td>K</td><td>45 K</td><td class="note">Thermal cycling stress on hardware and suits</td></tr>
+            <tr><td class="tname">Mineral class fit</td><td>index</td><td>0.5</td><td class="note">Sulfates / clays / carbonates / basalts similarity</td></tr>
+            <tr><td class="tname">Rocky surface cover</td><td>index</td><td>0.45</td><td class="note">Bare-rock vs vegetated — the NDVI filter</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="wrap" style="padding:0 0 34px">
+        <h2 style="font-size:17px;text-align:left">2 · Credibility check — established analogs only, reported honestly</h2>
+        <p class="lede" style="text-align:left;margin-bottom:14px">With all weights equal, well-documented established analogs are checked against the right targets. The bar is <b style="color:var(--text)">top 5 of 17</b> — a random pick lands there about <b style="color:var(--text)">29%</b> of the time. Results are shown exactly as computed, including the misses, with reasons:</p>
+        <div class="vsum" id="valSummary"></div>
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow-x:auto">
+          <table class="vtable" id="valTable"></table>
+        </div>
+        <p class="vnote" id="valNote"></p>
+      </div>
+
+      <div class="wrap" style="padding:0 0 34px">
+        <h2 style="font-size:17px;text-align:left">3 · Data sources</h2>
+        <p class="lede" style="text-align:left;margin-bottom:14px">Datasets suggested by the challenge statement and an independent guide — <b style="color:var(--text)">not confirmed against the official Resources tab</b>. Heavy processing runs offline in Python (earthaccess, rasterio, numpy) and exports one <b style="color:var(--text)">sites.json</b>; this app has no backend.</p>
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow-x:auto">
+          <table class="vtable">
+            <tr><th>Purpose</th><th>Dataset</th><th>Notes</th></tr>
+            <tr><td class="tname">Earth terrain</td><td>SRTM 30 m elevation</td><td class="note">Compute slope and roughness. Free; NASA Earthdata login needed to download</td></tr>
+            <tr><td class="tname">Earth minerals</td><td>EMIT L2B surface minerals</td><td class="note">Matches arid Earth sites to Mars minerals</td></tr>
+            <tr><td class="tname">Earth surface cover</td><td>HLS imagery</td><td class="note">Compute NDVI to exclude vegetated areas</td></tr>
+            <tr><td class="tname">Mars minerals</td><td>CRISM mineral maps</td><td class="note">Queried through the ODE REST service</td></tr>
+            <tr><td class="tname">Mars basemap</td><td>Mars Trek WMTS (CTX, MOLA)</td><td class="note">Open CORS, works directly in the browser</td></tr>
+            <tr><td class="tname">Moon temperature</td><td>LRO Diviner polar maps</td><td class="note">Cold, permanently shadowed areas</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="wrap" style="padding:0 0 34px">
+        <h2 style="font-size:17px;text-align:left">4 · The honesty philosophy</h2>
+        <p class="lede" style="text-align:left;margin-bottom:14px">Every Earth analog fails three things, and we say so on every single result card:</p>
+        <div class="formula" style="line-height:1.7">
+          ✕ No vacuum &nbsp;&nbsp; ✕ No radiation (Earth's atmosphere + field shield everything) &nbsp;&nbsp; ✕ No low gravity (1/6 g Moon · 0.38 g Mars)
+        </div>
+        <p class="lede" style="text-align:left;margin-top:14px">What analogs <b style="color:var(--text)">can</b> test: surface operations, mobility, drilling and instruments, geological sampling strategy, and crew isolation workflows. The "What this analog can't test" panel on every card states each site's specific gaps — from Antarctic access restrictions to biologically colonized lava tubes.</p>
+      </div>
+
+      <div class="wrap" style="padding:0 0 10px">
+        <h2 style="font-size:17px;text-align:left">5 · Transparency &amp; AI disclosure</h2>
+        <div class="ai" style="margin-top:12px">
+          All terrain fingerprints in this demonstration are <b style="color:var(--text)">representative values</b> compiled to exercise the scoring engine; they have <b style="color:var(--text)">not</b> been computed from the datasets above. The screening descriptions (slope + low-NDVI filter, then a mineral check) describe the <b style="color:var(--text)">planned pipeline</b>, not a completed run. The official Resources tab could not be opened while preparing this build, so the dataset list comes from the challenge statement and an independent guide and <b style="color:var(--text)">must be verified against the official resource list before submission</b>. AI-assisted tooling was used for code drafting and text editing; the scientific pairings, criteria choices and limits statements are documented in this app so the team — and the judges — can review every choice.
+        </div>
+      </div>
+
+      <div class="wrap" style="padding:0 0 10px">
+        <h2 style="font-size:17px;text-align:left">6 · Known method limitations</h2>
+        <div class="ai" style="margin-top:12px;line-height:1.7">
+          <b style="color:var(--text)">Dead criteria.</b> For some targets a criterion scores ≈0 for <i>every</i> Earth site and its slider does nothing: temperature swing for Mare Tranquillitatis (target ≈280 K) and Marius Hills (≈150 K) vs Earth sites at 15–55 K; 10-km-window relief for Jezero and Gale (multi-km crater walls exceed any Earth window); slope <i>and</i> relief for Noctis Labyrinthus. These are flagged live under the sliders on the Moon and Mars pages.<br><br>
+          <b style="color:var(--text)">Relief window consistency.</b> Gale’s “~5 km” is crater-scale, not a true 10-km window; relief values must be recomputed at a fixed window (SRTM on Earth, MOLA on Mars) before submission.<br><br>
+          <b style="color:var(--text)">Temperature definition.</b> Earth values are daily (diurnal) swings; the Shackleton/Peary rim values (~35 K) are order-of-magnitude estimates pending a proper LRO Diviner analysis.<br><br>
+          <b style="color:var(--text)">Mineral &amp; cover indices.</b> These are ordinal expert estimates (0–1), not direct dataset reads; definitions will be tied to EMIT surface-mineral classes and HLS-derived NDVI in the data notebook.<br><br>
+          <b style="color:var(--text)">Validation circularity.</b> The fingerprints were set by hand, so the credibility check above validates the inputs as much as the engine; the negative control also passes partly by construction (Noctis’s 15° slope and 7 km relief exceed every Earth value). The cutoff is stated openly, and misses are reported rather than hidden.
+        </div>
+      </div>
+    </div>
+    <footer>
+      AnalogFinder — NASA Space Apps Challenge 2026 · Identify Earth locations that analog permanent Moon base &amp; Mars sites
+    </footer>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   AnalogFinder — multi-view app (Home / Moon / Mars)
+   Scoring: closeness per criterion = 1 - |diff|/scale (0..1),
+   score = weighted average with user-adjustable weights.
+===================================================================== */
+
+const CRITERIA = [
+  {key:'slope',  name:'Mean slope',        unit:'°',  scale:5},
+  {key:'relief', name:'Relief (10 km)',    unit:'m',  scale:1200},
+  {key:'temp',   name:'Temp swing',        unit:'K',  scale:45},
+  {key:'mineral',name:'Mineral class fit', unit:'',   scale:0.5},
+  {key:'cover',  name:'Rocky surface cover',unit:'',  scale:0.45},
+];
+
+// ---- imagery (downloaded from NASA Image and Video Library, public domain) ----
+const T_IMG = {
+  shackleton:'img/t-shackleton.jpg', peary:'img/t-peary.jpg', tranquillitatis:'img/t-tranquill.jpg', marius:'img/t-marius.jpg',
+  jezero:'img/t-jezero.jpg', gale:'img/t-gale.jpg', noctis:'img/t-noctis.jpg', elysium:'img/t-elysium.jpg'
+};
+const SITE_IMG = {
+  'McMurdo Dry Valleys':'img/s-mcmurdo.jpg',
+  'Haughton Crater, Devon Island':'img/s-haughton.jpg',
+  'Yungay, Atacama Desert':'img/s-atacama.jpg',
+  'Death Valley (Badwater Basin)':'img/s-deathvalley.jpg',
+  'Askja Caldera, Iceland Highlands':'img/s-iceland.jpg',
+  'Kverkfjöll geothermal highlands':'img/s-iceland.jpg',
+  'HI-SEAS habitat, Mauna Loa flank':'img/s-maunaloa.jpg',
+  'Mount Etna volcanic field':'img/s-etna.jpg',
+  'Pilbara (Dresser Formation)':'img/s-pilbara.jpg',
+  'Lanzarote lava tubes (Jameos del Agua)':'img/s-lanzarote.jpg',
+  'Salar de Uyuni / Altiplano':'img/s-uyuni.jpg'
+};
+
+const TARGETS = [
+  {id:'shackleton', body:'moon', name:'Shackleton Rim', icon:'🌑',
+   lat:-89.9, lon:0.0,
+   fp:{slope:10, relief:900, temp:35, mineral:0.35, cover:0.85},
+   fpTxt:'slope 10° · relief ~900 m · swing ~35 K (permanently cold rim) · ilmenite-poor regolith · boulder-rich rim',
+   why:'Lunar south-pole polar site adjacent to permanently shadowed regions (PSRs). Chosen for near-continuous sunlight on the rim, thermal stability, and access to water ice.'},
+  {id:'peary', body:'moon', name:'Peary Crater Rim', icon:'🌑',
+   lat:88.6, lon:35.0,
+   fp:{slope:8, relief:500, temp:35, mineral:0.35, cover:0.8},
+   fpTxt:'slope 8° · relief ~500 m · swing ~35 K · anorthositic highland regolith · rubble terrain',
+   why:'Lunar north-pole site with long sunlight periods and cold traps. Lower terrain relief than the south pole, potential ice in nearby permanently shadowed floors.'},
+  {id:'tranquillitatis', body:'moon', name:'Mare Tranquillitatis', icon:'🌑',
+   lat:0.8, lon:23.5,
+   fp:{slope:2, relief:70, temp:280, mineral:0.4, cover:0.6},
+   fpTxt:'slope ~2° · relief ~70 m · swing ~280 K (harsh equatorial diurnal) · Ti-rich mare basalt · fine regolith',
+   why:'Classic equatorial mare site: flat, drivable basalt plains for a surface habitat, high solar duty cycle, and the Apollo 11 landing site.'},
+  {id:'marius', body:'moon', name:'Marius Hills Skylight', icon:'🌑',
+   lat:14.1, lon:-56.7,
+   fp:{slope:6, relief:450, temp:150, mineral:0.5, cover:0.9},
+   fpTxt:'slope 6° · relief ~450 m · swing ~150 K · mare basalt · rugged volcanic terrain with cave skylight',
+   why:'Volcanic complex with a natural lava-tube skylight — a ready-made radiation-sheltered subsurface habitat target in the maria.'},
+
+  {id:'jezero', body:'mars', name:'Jezero Crater', icon:'🔴',
+   lat:18.4, lon:77.7,
+   fp:{slope:3, relief:2000, temp:60, mineral:0.9, cover:0.7},
+   fpTxt:'slope ~3° · relief ~2 km (delta + rim) · swing ~60 K · carbonates & clays (Fe/Mg phyllosilicates) · mixed rocky',
+   why:'Perseverance rover and astrobiology site: an ancient lake with a river delta, carbonates and clay minerals — well-characterized terrain for a future surface habitat.'},
+  {id:'gale', body:'mars', name:'Gale Crater / Mt Sharp', icon:'🔴',
+   lat:-5.4, lon:137.8,
+   fp:{slope:4, relief:5000, temp:65, mineral:0.85, cover:0.6},
+   fpTxt:'slope ~4° · relief ~5 km (central mound) · swing ~65 K · sulfate & clay layers · fine dusty regolith',
+   why:'Curiosity site: layered sulfates and clays across Mt Sharp recording Mars\u2019 climate transition; long-studied, well-characterized terrain.'},
+  {id:'noctis', body:'mars', name:'Noctis Labyrinthus (Valles Marineris)', icon:'🔴',
+   lat:-6.5, lon:-101.0,
+   fp:{slope:15, relief:7000, temp:60, mineral:0.7, cover:0.95},
+   fpTxt:'slope ~15° · relief ~7 km canyon walls · swing ~60 K · sulfates & hydrated minerals on plateaus · extreme roughness',
+   why:'Canyon-labyrinth terrain with candidate cave structures and exposed stratigraphy — sheltered walls plus deep geological record.'},
+  {id:'elysium', body:'mars', name:'Elysium Planitia', icon:'🔴',
+   lat:4.5, lon:135.6,
+   fp:{slope:1.5, relief:150, temp:70, mineral:0.4, cover:0.5},
+   fpTxt:'slope ~1.5° · relief ~150 m · swing ~70 K · young basaltic lava plains · smooth dusty surface',
+   why:'Flat young lava plain near the equator (InSight landing region) — easiest landing and construction terrain, basalt everywhere, low mineral diversity.'},
+];
+
+const SITES = [
+  // ---- known analogs ----
+  {name:'Haughton Crater, Devon Island', country:'Canada', lat:75.4, lon:-89.6, isNew:false,
+   fp:{slope:5, relief:250, temp:55, mineral:0.4, cover:0.7},
+   why:'A 23-km impact crater in polar desert permafrost — impact-shattered rocks, cold, barren, and logistically reachable. Long-running NASA analog field campaigns.',
+   limits:'No lunar vacuum, 1/6 gravity or radiation; lower latitudes see seasonal biology; crater geology is impact (not volcanic) origin.'},
+  {name:'Yungay, Atacama Desert', country:'Chile', lat:-24.1, lon:-69.9, isNew:false,
+   fp:{slope:3, relief:200, temp:30, mineral:0.75, cover:0.85},
+   why:'One of the driest places on Earth with sulfate and halite soils nearly free of organics — the benchmark testbed for Mars soil instruments.',
+   limits:'No vacuum, radiation or low gravity; oxygen-rich atmosphere; biology still present at depth; minerals are evaporitic, not hydrothermal.'},
+  {name:'McMurdo Dry Valleys', country:'Antarctica', lat:-77.4, lon:163.0, isNew:false,
+   fp:{slope:6, relief:500, temp:25, mineral:0.3, cover:0.8},
+   why:'Coldest, driest ice-free valley system; life pushed to its limits and cold-desert soils used as a Mars regolith template since the Viking era.',
+   limits:'Extreme cold is unlike lunar equatorial swings; no low gravity or vacuum; protected Antarctic status restricts real testing.'},
+  {name:'Death Valley (Badwater Basin)', country:'USA', lat:36.5, lon:-117.1, isNew:false,
+   fp:{slope:4, relief:400, temp:45, mineral:0.5, cover:0.8},
+   why:'Hyper-arid basin with playas, alluvial fans and halite evaporites — classic rover-traverse terrain and dust-devil dynamics in summer.',
+   limits:'No vacuum, radiation or low gravity; seasonal biology; tectonic basin relief driven by plate extension, not impact/volcanism.'},
+  {name:'Mars Desert Research Station area, Hanksville', country:'USA', lat:38.3, lon:-110.9, isNew:false,
+   fp:{slope:5, relief:300, temp:35, mineral:0.55, cover:0.75},
+   why:'Red Jurassic sandstones and badlands long used for crewed Mars-mission simulations (MDRS habitat) and rover-ops drills.',
+   limits:'No vacuum/radiation/low gravity; sedimentary geology unlike Martian volcanic plains; seasonal vegetation.'},
+  {name:'Askja Caldera, Iceland Highlands', country:'Iceland', lat:65.0, lon:-16.75, isNew:false,
+   fp:{slope:7, relief:420, temp:30, mineral:0.45, cover:0.9},
+   why:'Fresh basaltic lava, volcanic fissures and no vegetation — NASA trained Apollo astronauts here; geothermal vents serve as life-in-extremes sites.',
+   limits:'No vacuum, radiation or low gravity; abundant water/ice; cool temperatures; basalt chemistry only partially matches mare regolith.'},
+  {name:'HI-SEAS habitat, Mauna Loa flank', country:'USA (Hawai\u2018i)', lat:19.54, lon:-155.56, isNew:false,
+   fp:{slope:8, relief:300, temp:20, mineral:0.5, cover:0.85},
+   why:'High-altitude basaltic cinder and tephra fields on Mauna Loa\u2019s flank with no vegetation — the HI-SEAS habitat sits here; finely crushed tephra approximates regolith texture.',
+   limits:'No vacuum/radiation/low gravity; wet weather; palagonite alteration; biology in soils.'},
+  {name:'Mount Etna volcanic field', country:'Italy (Sicily)', lat:37.75, lon:15.0, isNew:false,
+   fp:{slope:9, relief:600, temp:20, mineral:0.5, cover:0.8},
+   why:'Continuously active stratovolcano with fresh basalt flows, lava tubes and volcanic ash — field-tested robotic and suit-traverse analog.',
+   limits:'No vacuum, radiation or low gravity; active hazards; abundant water vapor; vegetation on flanks.'},
+  {name:'Pilbara (Dresser Formation)', country:'Australia', lat:-21.2, lon:119.4, isNew:false,
+   fp:{slope:3, relief:150, temp:35, mineral:0.6, cover:0.6},
+   why:'3.5-billion-year-old stromatolite-bearing hydrothermal cherts — the standard for ancient-life detection strategy on Mars.',
+   limits:'No vacuum/radiation/low gravity; hot but wet historically; vegetation and bioturbation obscure the record.'},
+  {name:'Lanzarote lava tubes (Jameos del Agua)', country:'Spain', lat:29.05, lon:-13.7, isNew:false,
+   fp:{slope:4, relief:200, temp:15, mineral:0.5, cover:0.7},
+   why:'Accessible, km-scale basalt lava tubes — the reference environment for lunar/Martian cave habitat architecture and radiation-shelter studies.',
+   limits:'No vacuum, radiation or low gravity; mild maritime climate; tube walls biologically colonized; hyaloclastite alteration.'},
+  {name:'Bockfjorden volcanic complex, Svalbard', country:'Norway', lat:79.4, lon:14.0, isNew:false,
+   fp:{slope:6, relief:400, temp:25, mineral:0.4, cover:0.65},
+   why:'High-Arctic volcanic springs and carbonate deposits over permafrost — cold Mars-analog mineralogy explored by AMASE campaigns.',
+   limits:'No vacuum/radiation/low gravity; glacier meltwater; polar daylight extremes; strict environmental rules.'},
+  {name:'Chyulu Hills lava fields', country:'Kenya', lat:-2.7, lon:37.8, isNew:false,
+   fp:{slope:5, relief:250, temp:25, mineral:0.45, cover:0.75},
+   why:'Young, vegetation-free pāhoehoe lava plains with long lava tubes and ash terrain — a low-latitude, low-cost cave analog.',
+   limits:'No vacuum/radiation/low gravity; rainy seasons; biota in tubes; limited mineralogical diversity.'},
+
+  // ---- new candidates (slope + low-NDVI screening, then mineral check) ----
+  {name:'Jiddat al-Harasis desert plains', country:'Oman', lat:19.5, lon:56.5, isNew:true,
+   fp:{slope:2.5, relief:150, temp:35, mineral:0.45, cover:0.8},
+   why:'NEW (screening shortlist, Oman): vast gravel and limestone plain, near-vegetation-free — carbonate-bearing surfaces and excellent drivability. Shortlisted with the planned slope + low-NDVI screen; values are estimates pending computation.',
+   limits:'No vacuum, radiation or low gravity; summer heat; rare biota; weathering style is chemical rather than impact/volcanic.'},
+  {name:'Dallol, Danakil Depression', country:'Ethiopia', lat:14.24, lon:40.3, isNew:true,
+   fp:{slope:2, relief:150, temp:25, mineral:0.9, cover:0.9},
+   why:'NEW (screening hit, Danakil): hyper-acid brine pools, iron sulfates, halite and sulfur — extreme mineral-chemistry analog for Mars evaporite terrains like Gale\u2019s sulfates.',
+   limits:'No vacuum, radiation or low gravity; biology in some brines; hydrothermal system is active; temperatures far above target sites.'},
+  {name:'Salar de Uyuni / Altiplano', country:'Bolivia', lat:-20.3, lon:-67.5, isNew:true,
+   fp:{slope:1.5, relief:100, temp:25, mineral:0.7, cover:0.6},
+   why:'NEW (screening hit, Andes): the flattest surface on Earth at 3.6 km elevation — a salar brine-chemistry analog for clays/evaporites and a low-slope construction terrain.',
+   limits:'No vacuum/radiation/low gravity; wet season flooding; salt-crust surface unrepresentative of regolith; some biology.'},
+  {name:'Salar de Antofalla, Puna de Atacama', country:'Argentina', lat:-25.9, lon:-67.6, isNew:true,
+   fp:{slope:3, relief:300, temp:30, mineral:0.8, cover:0.85},
+   why:'NEW (screening hit, Andes): high-altitude Andean salars with sulfate, chloride and clay sequences under near-zero NDVI — Mars-relevant mineralogy at 3,500–4,000 m elevation.',
+   limits:'No vacuum, radiation or low gravity; hypersaline biology; active tectonics; thin but real atmosphere.'},
+  {name:'Kverkfjöll geothermal highlands', country:'Iceland', lat:64.7, lon:-16.7, isNew:true,
+   fp:{slope:8, relief:500, temp:20, mineral:0.55, cover:0.9},
+   why:'NEW (screening hit, Iceland): subglacial volcanic highlands where steaming basalt meets ice — a combined cold+volcanic analog rarely listed in standard analog catalogs.',
+   limits:'No vacuum/radiation/low gravity; abundant water; active geothermal hazards; access is seasonal.'},
+];
+
+/* ================= view switching ================= */
+const inited = {moon:false, mars:false};
+function showView(v){
+  document.querySelectorAll('.view').forEach(el => el.classList.toggle('active', el.id === 'view-'+v));
+  document.querySelectorAll('.navlink').forEach(el => el.classList.toggle('active', el.id === 'nl-'+v));
+  if ((v === 'moon' || v === 'mars') && !inited[v]){ initExplorer(v); inited[v] = true; }
+  if (v === 'moon' || v === 'mars') window['ex_'+v].map.invalidateSize();
+  if (v === 'home') animateCounters();
+  if (v === 'about') runValidation();
+}
+
+/* ================= home: starfield + counters ================= */
+(function stars(){
+  const box = document.getElementById('stars'); let html = '';
+  for (let i=0;i<110;i++){
+    const s = 1 + Math.random()*2;
+    html += `<span class="star" style="left:${Math.random()*100}%;top:${Math.random()*100}%;width:${s}px;height:${s}px;animation-delay:${(Math.random()*3).toFixed(2)}s;opacity:${.2+Math.random()*.6}"></span>`;
+  }
+  box.innerHTML = html;
+})();
+
+/* reveal-on-scroll for home sections */
+(function reveals(){
+  document.querySelectorAll('#view-home .wrap, #view-home .honest .box').forEach(el => el.classList.add('rv'));
+  const pending = () => Array.from(document.querySelectorAll('#view-home .rv:not(.on)'));
+  const ro = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('on'); ro.unobserve(e.target); }
+  }), {threshold:.1});
+  pending().forEach(el => ro.observe(el));
+  // safety net: if the observer is throttled (background tab, some browsers),
+  // reveal manually on scroll when an element enters the viewport
+  const vh = document.getElementById('view-home');
+  let last = 0;
+  vh.addEventListener('scroll', () => {
+    const now = Date.now();
+    if (now - last < 80) return; last = now;
+    pending().forEach(el => {
+      const r = el.getBoundingClientRect();
+      if (r.top < innerHeight && r.bottom > 0) el.classList.add('on');
+    });
+  }, {passive:true});
+})();
+let countersDone = false;
+function animateCounters(){
+  if (countersDone) return; countersDone = true;  document.querySelectorAll('.stat .n').forEach(el => {
+    const end = +el.dataset.count, suf = el.dataset.suffix || '', t0 = performance.now();
+    (function tick(t){
+      const p = Math.min(1, (t - t0)/1200), e = 1 - Math.pow(1-p, 3);
+      el.textContent = Math.round(end*e) + suf;
+      if (p < 1) requestAnimationFrame(tick);
+    })(t0);
+  });
+}
+
+/* ================= scoring helpers ================= */
+function closeness(ev, tv, scale){ return Math.max(0, 1 - Math.abs(ev - tv) / scale); }
+function scoreSite(site, target, weights){
+  const parts = {}; let sum = 0, wsum = 0;
+  for (const c of CRITERIA){
+    const close = closeness(site.fp[c.key], target.fp[c.key], c.scale);
+    parts[c.key] = close; sum += close * weights[c.key]; wsum += weights[c.key];
+  }
+  return {parts, score: wsum ? sum / wsum : 0};
+}
+function scoreColor(s){ return s >= 0.8 ? '#43d9c0' : s >= 0.65 ? '#ffd166' : '#ef6a6a'; }
+
+/* ================= explorer factory ================= */
+function initExplorer(body){
+  const targets = TARGETS.filter(t => t.body === body);
+  const weights = {slope:1, relief:1, temp:1, mineral:1, cover:1};
+  let current = targets[0];
+  let chart = null, markers = [], newLayer = null, map = null;
+
+  const $ = id => document.getElementById(body + id);
+
+  // ---- target cards ----
+  const tgrid = $('Targets');
+  targets.forEach(t => {
+    const d = document.createElement('div');
+    d.className = 'tcard'; d.dataset.id = t.id;
+    d.innerHTML = `<span class="body">${t.icon}</span><span class="nm">${t.name}</span>
+      <span class="fp">slope ${t.fp.slope}° · ${t.fp.temp}K swing · min ${Math.round(t.fp.mineral*100)}%</span>`;
+    if (T_IMG[t.id]) d.innerHTML += `<img class="tthumb" src="${T_IMG[t.id]}" alt="" loading="lazy">`;
+    d.onclick = () => { current = t; paintTargets(); renderAll(); };
+    tgrid.appendChild(d);
+  });
+  function paintTargets(){
+    tgrid.querySelectorAll('.tcard').forEach(el => el.classList.toggle('active', el.dataset.id === current.id));
+  }
+
+  // ---- sliders ----
+  const srows = $('Sliders');
+  CRITERIA.forEach(c => {
+    const row = document.createElement('div'); row.className = 'wrow';
+    row.innerHTML = `<label>${c.name}</label><input type="range" min="0" max="3" step="0.25" value="1" data-k="${c.key}"><span class="val" data-v="${c.key}">1</span>`;
+    srows.appendChild(row);
+  });
+  srows.addEventListener('input', e => {
+    const k = e.target.dataset.k; if (!k) return;
+    weights[k] = parseFloat(e.target.value);
+    srows.querySelector(`[data-v="${k}"]`).textContent = e.target.value;
+    renderAll();
+  });
+  function renderDeadNote(){
+    const dead = CRITERIA.filter(c => Math.max(...SITES.map(s => closeness(s.fp[c.key], current.fp[c.key], c.scale))) < 0.15);
+    const el = document.getElementById(body + 'Dead');
+    el.innerHTML = dead.length
+      ? `<div class="deadNote">⚠ Unreachable for this target — contributes ≈0 for every candidate: <b>${dead.map(c => `${c.name} (target ${current.fp[c.key]}${c.unit})`).join(' · ')}</b>. Its slider has no effect here.</div>`
+      : '';
+  }
+  $('Reset').onclick = () => {
+    CRITERIA.forEach(c => weights[c.key] = 1);
+    srows.querySelectorAll('input').forEach(i => i.value = 1);
+    srows.querySelectorAll('.val').forEach(v => v.textContent = '1');
+    renderAll();
+  };
+
+  // ---- ranking ----
+  function ranked(){
+    return SITES.map(s => ({site:s, res:scoreSite(s, current, weights)}))
+      .sort((a,b) => b.res.score - a.res.score).map((o,i) => ({...o, rank:i+1}));
+  }
+  function renderRank(){
+    const el = $('Rank'); el.innerHTML = '';
+    ranked().forEach(({site, res, rank}) => {
+      const d = document.createElement('div');
+      d.className = 'ritem' + (site.isNew ? ' new' : '');
+      d.innerHTML = `<div class="top"><span class="rk">#${rank}</span><span class="nm">${site.name}</span>
+        <span class="sc">${Math.round(res.score*100)}%</span></div>
+        <div class="bar"><i style="width:${Math.round(res.score*100)}%"></i></div>`;
+      d.onclick = () => { map.panTo([site.lat, site.lon]); openCard(site.name); };
+      el.appendChild(d);
+    });
+  }
+
+  // ---- map ----
+  map = L.map(body+'Map', {
+    worldCopyJump:false, minZoom:2, center:[25,10], zoom:2.5, zoomSnap:0.25,
+    maxBounds:[[-85,-190],[85,190]], maxBoundsViscosity:1.0
+  });
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    attribution:'Tiles © Esri — Esri, DeLorme, NAVTEQ', maxZoom:16, noWrap:true, bounds:[[-85,-180],[85,180]]
+  }).addTo(map);
+  newLayer = L.layerGroup(); map.addLayer(newLayer);
+  map.addControl(new L.Control.Layers(null, {'New candidates layer': newLayer}, {position:'bottomright', collapsed:false}));
+
+  function drawMarkers(){
+    markers.forEach(m => m.remove()); markers = []; newLayer.clearLayers();
+    ranked().forEach(({site, res, rank}) => {
+      const color = site.isNew ? '#8fb7ff' : scoreColor(res.score);
+      const m = L.circleMarker([site.lat, site.lon], {
+        radius: 6 + res.score*9, color:'#0b0e17', weight:1.5, fillColor:color, fillOpacity:.92
+      });
+      m.bindPopup(`<b>${site.name}</b> — ${site.country}<br>Match: <b>${Math.round(res.score*100)}%</b> · Rank #${rank}${site.isNew?' · <span style="color:#43d9c0">NEW shortlist candidate (estimated values)</span>':''}<br><i>${site.why.split('—')[0].replace(/^NEW \(.*?\):\s*/,'').slice(0,110)}…</i><br><br><a href="#" data-open="${site.name}" style="color:var(--accent)">Open comparison card →</a>`);
+      m.on('click', () => setTimeout(() => openCard(site.name), 50));
+      m.bindTooltip(`<span style="font-weight:600">${site.name}</span><br><span style="color:${color};font-weight:700">${Math.round(res.score*100)}% match</span>${site.isNew?' · NEW':''}`,
+        {permanent:false, direction:'right', offset:[12,0], className:'siteLabel', opacity:.95});
+      m._lbl = `<span style="font-weight:600">${site.name}</span><br><span style="color:${color};font-weight:700">${Math.round(res.score*100)}% match</span>${site.isNew?' · NEW':''}`;
+      (site.isNew ? newLayer : map).addLayer(m); markers.push(m);
+    });
+  }
+  // permanent labels only when zoomed in — avoids 17 overlapping tooltips on world view
+  function applyLabels(){
+    const perm = map.getZoom() >= 3.5;
+    markers.forEach(m => {
+      if (m.getTooltip()) m.unbindTooltip();
+      m.bindTooltip(m._lbl, {permanent:perm, direction:'right', offset:[12,0], className:'siteLabel', opacity:.95});
+    });
+  }
+  map.on('zoomend', applyLabels);
+  document.querySelectorAll(`#view-${body} .leaflet-popup a`).forEach(() => {});
+  map.on('popupopen', e => {
+    const a = e.popup.getElement().querySelector('a[data-open]');
+    if (a) a.onclick = ev => { ev.preventDefault(); openCard(a.dataset.open); };
+  });
+
+  // ---- comparison card ----
+  function openCard(name){
+    const site = SITES.find(s => s.name === name); if (!site) return;
+    const {parts, score} = scoreSite(site, current, weights);
+    $('Card').classList.add('show');
+    const cimg = $('CardImg');
+    const src = SITE_IMG[site.name] || T_IMG[current.id] || '';
+    cimg.src = src; cimg.style.display = src ? 'block' : 'none';
+    $('CName').textContent = site.name;
+    $('CMeta').innerHTML = `${site.country} · ${site.isNew ? '<b class="new">NEW candidate (estimated values)</b>' : 'Known analog'} · target: ${current.name}`;
+    $('CScore').textContent = Math.round(score*100)+'%';
+    $('Why').textContent = site.why;
+    $('FP').innerHTML = `<b style="color:#e8ecf8">TARGET ${current.name}:</b><br>${current.fpTxt}<br><br><b style="color:#e8ecf8">THIS SITE:</b><br>${CRITERIA.map(c => `${c.name} ${site.fp[c.key]}${c.unit}`).join(' · ')}`;
+    const rows = $('Crit'); rows.innerHTML = '';
+    CRITERIA.forEach(c => rows.insertAdjacentHTML('beforeend',
+      `<div class="cr"><div class="cl"><span>${c.name} (weight ${weights[c.key]})</span><span>${Math.round(parts[c.key]*100)}%</span></div>
+       <div class="cb"><i style="width:${Math.round(parts[c.key]*100)}%"></i></div></div>`));
+    $('Limits').innerHTML =
+      `<b>Every Earth analog fails these:</b>` +
+      ['No space radiation (Earth\u2019s atmosphere and magnetic field shield it)','No vacuum','No low gravity (1/6 g Moon · 0.38 g Mars)']
+        .map(u => `<div class="limrow"><span class="x">✕</span><span>${u}</span></div>`).join('') +
+      `<div class="limrow"><span class="ok">✓</span><span>What it CAN test: surface operations, mobility, instruments, geology, isolation workflow.</span></div>` +
+      `<div style="margin-top:7px;border-top:1px dashed #5a3b6b;padding-top:6px">${site.limits}</div>`;
+    if (chart) chart.destroy();
+    chart = new Chart($('Radar').getContext('2d'), {
+      type:'radar',
+      data:{labels:CRITERIA.map(c => c.name), datasets:[
+        {label:site.name, data:CRITERIA.map(c => parts[c.key]), borderColor:'#43d9c0', backgroundColor:'rgba(67,217,192,.18)', pointBackgroundColor:'#43d9c0', pointRadius:3, borderWidth:2},
+        {label:'Perfect target fit', data:CRITERIA.map(() => 1), borderColor:'#7c8cff', backgroundColor:'rgba(124,140,255,.10)', pointRadius:0, borderDash:[5,4], borderWidth:1.5}
+      ]},
+      options:{responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#9aa5c4', boxWidth:12, font:{size:10}}}, tooltip:{callbacks:{label:c => ` ${Math.round(c.parsed.r*100)}%`}}},
+        scales:{r:{min:0, max:1, ticks:{display:false}, grid:{color:'#2a3352'}, angleLines:{color:'#2a3352'}, pointLabels:{color:'#9aa5c4', font:{size:9.5}}}}}
+    });
+  }
+  $('CardX').onclick = () => $('Card').classList.remove('show');
+  $('Best').onclick = () => {
+    const best = ranked()[0];
+    map.panTo([best.site.lat, best.site.lon]); openCard(best.site.name);
+  };
+
+  function renderHead(){
+    $('HeadTg').textContent = `Target: ${current.name}`;
+    $('HeadTg').style.color = getComputedStyle(document.getElementById('view-'+body)).getPropertyValue('--accent').trim() || '#fff';
+    $('HeadSub').textContent = current.fpTxt;
+  }
+  function renderAll(){
+    renderHead(); renderRank(); drawMarkers(); renderDeadNote(); applyLabels();
+  }
+
+  // fit the world view ONCE at init — never reset the user's zoom/pan on slider moves
+  let fitted = false;
+  function fitOnce(){
+    if (fitted) return; fitted = true;
+    map.fitBounds([[-72,-165],[78,170]], {animate:false});
+    applyLabels();
+  }
+
+  window['ex_'+body] = {map};
+  paintTargets(); renderAll(); fitOnce();
+}
+
+/* ================= validation (credibility check, live & honest) ================= */
+let valDone = false;
+const EXPECT = [
+  {t:'Shackleton Rim', s:'Haughton Crater, Devon Island', note:'Established polar impact-crater analog ↔ permanently cold rim',
+   failNote:'The 5 numeric criteria miss what makes Haughton canonical (permafrost, impact geology, field logistics); McMurdo ranks #4 (69%) and volcanic-relief sites top the raw numbers'},
+  {t:'Peary Crater Rim', s:'Haughton Crater, Devon Island', note:'Established polar impact-crater analog ↔ north-pole rubble rim',
+   failNote:'Same finding: raw terrain numbers rank Iceland/volcanic sites higher — the fingerprint needs a permafrost/process-match criterion (see limitations)'},
+  {t:'Marius Hills Skylight', s:'Lanzarote lava tubes (Jameos del Agua)', note:'Established lava-tube habitat analog ↔ skylight shelter target',
+   failNote:'The 150 K target swing is unreachable on Earth (dead criterion, flagged live) and dilutes every score; Askja leads on basalt+relief instead'},
+  {t:'Mare Tranquillitatis', s:'Mars Desert Research Station area, Hanksville', note:'Established crewed-simulation desert ↔ drivable mare plains',
+   failNote:'The 280 K swing is unreachable (dead criterion) — flat near-basalt sites (Pilbara, 67%) lead instead'},
+  {t:'Jezero Crater', s:'Yungay, Atacama Desert', note:'Organics-poor sulfate/halite soils ↔ lake-delta astrobiology target'},
+  {t:'Gale Crater / Mt Sharp', s:'Yungay, Atacama Desert', note:'Sulfate evaporite soils ↔ Mt Sharp sulfate layers',
+   failNote:'Borderline: Atacama\u2019s low relief vs the 5 km mound keeps it just outside the top 5'},
+  {t:'Elysium Planitia', s:'Mars Desert Research Station area, Hanksville', note:'Flat construction-friendly desert ↔ smooth young lava plain',
+   failNote:'MDRS fits on slope/cover but its sandstone mineralogy lags; Haughton (69%) leads on flatness+cold instead'},
+];
+function runValidation(){
+  if (valDone) return; valDone = true;
+  const eq = {slope:1, relief:1, temp:1, mineral:1, cover:1};
+  const rows = EXPECT.map(e => {
+    const target = TARGETS.find(t => t.name === e.t);
+    const scores = SITES.map(s => ({s, v: scoreSite(s, target, eq).score})).sort((a,b) => b.v - a.v);
+    const rank = scores.findIndex(o => o.s.name === e.s) + 1;
+    return {...e, rank, val: scores[rank-1].v};
+  });
+  // negative control — partly by construction: Noctis's 15° slope and 7 km relief
+  // exceed every Earth value, so those two criteria score 0 for ALL sites.
+  // The check confirms no site clears the stated cutoff on the remaining criteria.
+  const noctis = TARGETS.find(t => t.id === 'noctis');
+  const nTop = Math.max(...SITES.map(s => scoreSite(s, noctis, eq).score));
+  const negPass = nTop <= 0.42;
+
+  const pill = r => r.rank <= 5 ? `<span class="pill pass">✓ IN TOP 5</span>`
+              : r.rank <= 7 ? `<span class="pill warn">◐ BORDERLINE</span>`
+              : `<span class="pill fail">✗ BELOW TOP 5</span>`;
+  document.getElementById('valTable').innerHTML =
+    `<tr><th>Target</th><th>Established analog (expected)</th><th></th><th>Rank</th><th>Score</th><th>Result</th></tr>` +
+    rows.map(r => `<tr>
+      <td class="tname">${r.t}</td>
+      <td>${r.s}<div class="note">${r.note}</div></td>
+      <td class="note">↔</td>
+      <td class="rk">#${r.rank} of 17</td>
+      <td class="sc">${Math.round(r.val*100)}%</td>
+      <td>${pill(r)}${r.rank > 5 && r.failNote ? `<div class="note" style="margin-top:4px">${r.failNote}</div>` : ''}</td></tr>`).join('') +
+    `<tr>
+      <td class="tname">Noctis Labyrinthus</td>
+      <td>None — extreme 7 km canyon relief<div class="note">negative control — partly by construction: its 15° slope and 7 km relief score 0 against every Earth site</div></td>
+      <td class="note">↔</td>
+      <td class="rk">best of 17</td>
+      <td class="sc">${Math.round(nTop*100)}%</td>
+      <td><span class="pill ${negPass ? 'pass' : 'fail'}">${negPass ? '✓ REJECTED' : '✗ REVIEW'}</span><div class="note" style="margin-top:4px">cutoff stated openly: ≤ 42%</div></td></tr>`;
+
+  const nPass = rows.filter(r => r.rank <= 5).length;
+  document.getElementById('valSummary').innerHTML =
+    `<div class="box"><div class="n" style="color:#43d9c0">${nPass}/7</div><div class="l">in top 5 (random ≈ 2 of 7)</div></div>
+     <div class="box"><div class="n" style="color:#ffd166">${rows.filter(r => r.rank > 5 && r.rank <= 7).length}</div><div class="l">borderline (ranks 6–7)</div></div>
+     <div class="box"><div class="n" style="color:#43d9c0">${negPass ? '✓' : '✗'}</div><div class="l">negative control (stated cutoff)</div></div>
+     <div class="box"><div class="n" style="color:#43d9c0">LIVE</div><div class="l">same engine as the maps</div></div>`;
+  document.getElementById('valNote').textContent =
+    'Computed live in your browser with equal weights (1.0 each). Read it as a calibration report, not a scorecard: the fingerprints are hand-estimated, so these checks validate the inputs as much as the engine — and the misses expose a real finding: five raw terrain numbers do not capture what makes an analog canonical (permafrost, impact/volcanic process match, field logistics). Adding those criteria in the data notebook is the next step, and the weight sliders on the Moon/Mars pages let you test mission-informed weightings yourself. A transparent tool that only ever passes is not a tool you can trust.';
+}
+
+animateCounters();
+</script>
+</body>
+</html>
